@@ -5,14 +5,14 @@
 <title>Reservas de Casas</title>
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
 <style>
-  body { font-family: Arial, sans-serif; max-width: 900px; margin: auto; padding: 20px; background: #f7f7f7; }
-  h1 { text-align: center; margin-bottom: 20px; }
-  select { width: 100%; padding: 10px; margin-bottom: 20px; font-size: 16px; }
-  #calendar { max-width: 900px; margin: auto; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-  #reserva-info { margin-top: 20px; padding: 15px; background: #e0f7fa; border-radius: 8px; display: none; }
-  #reserva-info p { margin: 5px 0; }
-  #btnReservar { padding: 10px 20px; font-size: 16px; background: #00796B; color: white; border: none; border-radius: 5px; cursor: pointer; }
-  #btnReservar:hover { background: #004D40; }
+body { font-family: Arial, sans-serif; max-width: 900px; margin: auto; padding: 20px; background: #f7f7f7; }
+h1 { text-align: center; margin-bottom: 20px; }
+select { width: 100%; padding: 10px; margin-bottom: 20px; font-size: 16px; }
+#calendar { max-width: 900px; margin: auto; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+#reserva-info { margin-top: 20px; padding: 15px; background: #e0f7fa; border-radius: 8px; display: none; }
+#reserva-info p { margin: 5px 0; }
+#btnReservar { padding: 10px 20px; font-size: 16px; background: #00796B; color: white; border: none; border-radius: 5px; cursor: pointer; }
+#btnReservar:hover { background: #004D40; }
 </style>
 </head>
 <body>
@@ -35,80 +35,70 @@
 
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby6JTBwnSekeVvQEHtZlwasW09EIdhy76_ci8_3uVtDW9NK4Azd/exec";
+const SCRIPT_URL = "TU_WEB_APP_URL"; // reemplazar con tu URL desplegada
 
 let allReservas = [];
 let calendar;
 let selectedRange = null;
 
-document.addEventListener('DOMContentLoaded', async function() {
-  const response = await fetch(SCRIPT_URL);
-  allReservas = await response.json();
+async function init() {
+  try {
+    const resp = await fetch(SCRIPT_URL);
+    allReservas = await resp.json();
 
-  // Llenar select de casas
-  const casas = [...new Set(allReservas.map(r => r.propiedad))];
-  const select = document.getElementById('casa');
-  casas.forEach(casa => {
-    const option = document.createElement('option');
-    option.value = casa;
-    option.textContent = casa;
-    select.appendChild(option);
-  });
+    const casas = [...new Set(allReservas.map(r => r.propiedad))];
+    const select = document.getElementById('casa');
+    casas.forEach(c => select.appendChild(new Option(c, c)));
 
-  // Inicializar calendario
-  const calendarEl = document.getElementById('calendar');
-  calendar = new FullCalendar.Calendar(calendarEl, {
-    initialView: 'dayGridMonth',
-    selectable: true,
-    selectOverlap: function(event) {
-      // No permitir seleccionar días bloqueados
-      return event.rendering !== 'background';
-    },
-    select: function(info) {
-      selectedRange = info;
-      document.getElementById('reserva-casa').textContent = select.value;
-      document.getElementById('reserva-inicio').textContent = info.startStr;
-      document.getElementById('reserva-fin').textContent = info.endStr;
-      document.getElementById('reserva-info').style.display = 'block';
-    },
-    events: []
-  });
-  calendar.render();
+    calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+      initialView: 'dayGridMonth',
+      selectable: true,
+      selectOverlap: function(event) { return event.display !== 'background'; },
+      select: function(info) {
+        selectedRange = info;
+        document.getElementById('reserva-casa').textContent = select.value;
+        document.getElementById('reserva-inicio').textContent = info.startStr;
+        document.getElementById('reserva-fin').textContent = info.endStr;
+        document.getElementById('reserva-info').style.display = 'block';
+      },
+      events: []
+    });
+    calendar.render();
 
-  select.addEventListener('change', function() {
-    const casaSeleccionada = this.value;
-    const eventos = allReservas
-      .filter(r => r.propiedad === casaSeleccionada)
-      .map(r => ({
-        start: r.start,
-        end: r.end ? r.end : r.start,
-        title: r.title,
-        display: 'background',
-        backgroundColor: getColor(r.title)
-      }));
-    calendar.removeAllEvents();
-    calendar.addEventSource(eventos);
-    selectedRange = null;
-    document.getElementById('reserva-info').style.display = 'none';
-  });
+    select.addEventListener('change', function() {
+      const eventos = allReservas
+        .filter(r => r.propiedad === select.value)
+        .map(r => ({
+          start: r.start,
+          end: r.end ? r.end : r.start,
+          title: r.title,
+          display: 'background',
+          backgroundColor: getColor(r.title)
+        }));
+      calendar.removeAllEvents();
+      calendar.addEventSource(eventos);
+      selectedRange = null;
+      document.getElementById('reserva-info').style.display = 'none';
+    });
 
-  document.getElementById('btnReservar').addEventListener('click', async function() {
-    if (!selectedRange || !select.value) return alert("Seleccioná casa y rango de fechas.");
-    const data = new URLSearchParams();
-    data.append('propiedad', select.value);
-    data.append('inicio', selectedRange.startStr);
-    data.append('fin', selectedRange.endStr);
+    document.getElementById('btnReservar').addEventListener('click', async function() {
+      if(!selectedRange || !select.value) return alert("Seleccioná casa y rango de fechas.");
+      const data = new URLSearchParams();
+      data.append('propiedad', select.value);
+      data.append('inicio', selectedRange.startStr);
+      data.append('fin', selectedRange.endStr);
 
-    const resp = await fetch(SCRIPT_URL, { method: 'POST', body: data });
-    const result = await resp.json();
-    if(result.status === "ok"){
-      alert("Reserva registrada correctamente!");
-      location.reload();
-    } else {
-      alert("Error al registrar la reserva.");
-    }
-  });
-});
+      const res = await fetch(SCRIPT_URL, { method: 'POST', body: data });
+      const result = await res.json();
+      if(result.status==="ok"){ alert("Reserva registrada!"); location.reload(); }
+      else alert("Error al guardar reserva.");
+    });
+
+  } catch(e) {
+    console.error(e);
+    alert("Error cargando reservas. Revisa la URL del Apps Script y permisos.");
+  }
+}
 
 function getColor(estado) {
   switch(estado.toLowerCase()) {
@@ -118,6 +108,8 @@ function getColor(estado) {
     default: return '#4D96FF';
   }
 }
+
+init();
 </script>
 
 </body>
