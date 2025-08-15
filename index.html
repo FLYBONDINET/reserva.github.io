@@ -4,36 +4,82 @@
 <meta charset="UTF-8">
 <title>Reservas de Casas</title>
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <style>
-body { font-family: 'Roboto', sans-serif; margin: 0; background: #f0f2f5; }
-header { background: #4a90e2; color: white; padding: 15px; text-align: center; font-size: 1.3em; }
-main { max-width: 900px; margin: 20px auto; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);}
-select, button { width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #ccc; }
-button { background: #4a90e2; color: white; cursor: pointer; }
-button:hover { background: #357abd; }
-#calendar { max-width: 100%; margin: 0 auto 20px; border-radius: 8px; box-shadow:0 3px 10px rgba(0,0,0,0.1);}
-.tooltip { position:absolute; background:#333; color:white; padding:6px 12px; border-radius:6px; font-size:0.85em; display:none; z-index:1000; pointer-events:none;}
+  body { font-family: Arial, sans-serif; max-width: 900px; margin: auto; padding: 20px; background: #f7f7f7; }
+  h1 { text-align: center; }
+  select { width: 100%; padding: 10px; margin-bottom: 20px; font-size: 16px; }
+  #calendar { max-width: 900px; margin: auto; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
 </style>
 </head>
 <body>
 
-<header>📅 Reservas de Casas</header>
-<main>
-<label for="propiedad">Seleccionar propiedad:</label>
-<select id="propiedad"><option value="">-- Cargando --</option></select>
+<h1>Reservas de Casas</h1>
+
+<label for="casa">Selecciona una Casa:</label>
+<select id="casa">
+  <option value="">-- Elige una casa --</option>
+</select>
+
 <div id="calendar"></div>
-<button id="reservarBtn">Reservar</button>
-<div id="tooltip" class="tooltip"></div>
-</main>
 
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycby6JTBwnSekeVvQEHtZlwasW09EIdhy76_ci8_3uVtDW9y7OEm6MzetmUdyX5NK4Azd/exec"; // Reemplaza con tu URL publicada
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby6JTBwnSekeVvQEHtZlwasW09EIdhy76_ci8_3uVtDW9y7OEm6MzetmUdyX5NK4Azd/exec";
 
-document.addEventListener('DOMContentLoaded', function () {
+let allReservas = [];
+let calendar;
+
+document.addEventListener('DOMContentLoaded', async function() {
+  const response = await fetch(SCRIPT_URL);
+  allReservas = await response.json();
+
+  // Llenar select de casas
+  const casas = [...new Set(allReservas.map(r => r.propiedad))];
+  const select = document.getElementById('casa');
+  casas.forEach(casa => {
+    const option = document.createElement('option');
+    option.value = casa;
+    option.textContent = casa;
+    select.appendChild(option);
+  });
+
+  // Inicializar calendario
   const calendarEl = document.getElementById('calendar');
-  const propiedadSelect = document.getElementById("propiedad");
-  const tooltip = document.getElementById("tooltip");
+  calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    selectable: false,
+    events: []
+  });
+  calendar.render();
+
+  select.addEventListener('change', function() {
+    const casaSeleccionada = this.value;
+    const eventos = allReservas
+      .filter(r => r.propiedad === casaSeleccionada)
+      .map(r => ({
+        start: r.start,
+        end: r.end ? r.end : r.start,
+        title: r.title,
+        display: 'background',
+        backgroundColor: getColor(r.title)
+      }));
+    calendar.removeAllEvents();
+    calendar.addEventSource(eventos);
+  });
+});
+
+function getColor(estado) {
+  switch(estado.toLowerCase()) {
+    case 'reserva': return '#FF6B6B';
+    case 'limpieza': return '#FFD93D';
+    case 'mantenimiento': return '#6BCB77';
+    default: return '#4D96FF';
+  }
+}
+</script>
+
+</body>
+</html>
   let eventos = [];
   let rangoSeleccionado = null;
 
