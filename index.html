@@ -38,21 +38,26 @@ select, input { width: 100%; padding: 10px; margin-bottom: 10px; font-size: 16px
 
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1-Eg9Dal8paC93fM5InbSqLdfl0Tifpw3q8o5WELp3bj1AG2B6aRVoSkzmD97M4ch/exec";
+const SCRIPT_URL = "TU_WEB_APP_URL"; // reemplaza con tu URL
 
 let allReservas = [];
+let casasData = [];
 let calendar;
 let selectedRange = null;
 let select;
 
 async function init() {
   try {
+    // Traer reservas
     const resp = await fetch(SCRIPT_URL);
     allReservas = await resp.json();
 
+    // Traer casas y precios
+    const casasResp = await fetch(SCRIPT_URL + "?action=casas");
+    casasData = await casasResp.json();
+
     select = document.getElementById('casa');
-    const casas = [...new Set(allReservas.map(r => r.propiedad))];
-    casas.forEach(c => select.appendChild(new Option(c, c)));
+    casasData.forEach(c => select.appendChild(new Option(c.propiedad, c.propiedad)));
 
     calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
       initialView: 'dayGridMonth',
@@ -64,11 +69,10 @@ async function init() {
         document.getElementById('reserva-inicio').textContent = info.startStr;
         document.getElementById('reserva-fin').textContent = info.endStr;
 
-        // Calcular monto provisional
         const dias = Math.ceil((new Date(info.endStr) - new Date(info.startStr)) / (1000*3600*24));
-        const propData = allReservas.find(r => r.propiedad === select.value);
-        const montoUnitario = parseFloat(propData ? propData.montoUnitario : 0) || 0;
-        document.getElementById('reserva-monto').textContent = (montoUnitario*dias).toFixed(2);
+        const prop = casasData.find(c => c.propiedad === select.value);
+        const monto = prop ? prop.precio * dias : 0;
+        document.getElementById('reserva-monto').textContent = monto.toFixed(2);
 
         document.getElementById('reserva-info').style.display = 'block';
       },
@@ -115,10 +119,7 @@ async function init() {
       }
     });
 
-  } catch(e) {
-    console.error(e);
-    alert("Error cargando reservas. Revisa la URL del Apps Script y permisos.");
-  }
+  } catch(e) { console.error(e); alert("Error cargando datos."); }
 }
 
 function getColor(estado) {
