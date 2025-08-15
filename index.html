@@ -1,116 +1,47 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Reservas de Casas</title>
-<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
-<style>
-body { font-family: Arial, sans-serif; max-width: 900px; margin: auto; padding: 20px; background: #f7f7f7; }
-h1 { text-align: center; margin-bottom: 20px; }
-select { width: 100%; padding: 10px; margin-bottom: 20px; font-size: 16px; }
-#calendar { max-width: 900px; margin: auto; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-#reserva-info { margin-top: 20px; padding: 15px; background: #e0f7fa; border-radius: 8px; display: none; }
-#reserva-info p { margin: 5px 0; }
-#btnReservar { padding: 10px 20px; font-size: 16px; background: #00796B; color: white; border: none; border-radius: 5px; cursor: pointer; }
-#btnReservar:hover { background: #004D40; }
-</style>
-</head>
-<body>
-
-<h1>Reservas de Casas</h1>
-
-<label for="casa">Selecciona una Casa:</label>
-<select id="casa">
-  <option value="">-- Elige una casa --</option>
-</select>
-
-<div id="calendar"></div>
-
 <div id="reserva-info">
   <p><strong>Casa:</strong> <span id="reserva-casa"></span></p>
   <p><strong>Inicio:</strong> <span id="reserva-inicio"></span></p>
   <p><strong>Fin:</strong> <span id="reserva-fin"></span></p>
+  <label>Nombre: <input type="text" id="reserva-nombre" placeholder="Nombre"></label>
+  <label>Apellido: <input type="text" id="reserva-apellido" placeholder="Apellido"></label>
+  <p><strong>Monto total:</strong> $<span id="reserva-monto">0</span></p>
   <button id="btnReservar">Reservar</button>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1-Eg9Dal8paC93fM5InbSqLdfl0Tifpw3q8o5WELp3bj1AG2B6aRVoSkzmD97M4ch/exec"; // reemplazar con tu URL desplegada
+// reemplazar solo la parte del botón y cálculo de monto
+document.getElementById('btnReservar').addEventListener('click', async function() {
+  const nombre = document.getElementById('reserva-nombre').value.trim();
+  const apellido = document.getElementById('reserva-apellido').value.trim();
 
-let allReservas = [];
-let calendar;
-let selectedRange = null;
+  if(!selectedRange || !select.value) return alert("Seleccioná casa y rango de fechas.");
+  if(!nombre || !apellido) return alert("Ingresá nombre y apellido.");
 
-async function init() {
-  try {
-    const resp = await fetch(SCRIPT_URL);
-    allReservas = await resp.json();
+  // Calcular días de reserva
+  const start = new Date(selectedRange.startStr);
+  const end = new Date(selectedRange.endStr);
+  const dias = Math.ceil((end.getTime() - start.getTime()) / (1000*3600*24));
 
-    const casas = [...new Set(allReservas.map(r => r.propiedad))];
-    const select = document.getElementById('casa');
-    casas.forEach(c => select.appendChild(new Option(c, c)));
+  // Buscar monto unitario en allReservas (columna E simulada)
+  const reservaProp = allReservas.find(r => r.propiedad === select.value);
+  let montoUnitario = parseFloat(reservaProp ? reservaProp.montoUnitario : 0) || 0;
+  const montoFinal = montoUnitario * dias;
+  document.getElementById('reserva-monto').textContent = montoFinal.toFixed(2);
 
-    calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
-      initialView: 'dayGridMonth',
-      selectable: true,
-      selectOverlap: function(event) { return event.display !== 'background'; },
-      select: function(info) {
-        selectedRange = info;
-        document.getElementById('reserva-casa').textContent = select.value;
-        document.getElementById('reserva-inicio').textContent = info.startStr;
-        document.getElementById('reserva-fin').textContent = info.endStr;
-        document.getElementById('reserva-info').style.display = 'block';
-      },
-      events: []
-    });
-    calendar.render();
+  const data = new URLSearchParams();
+  data.append('propiedad', select.value);
+  data.append('inicio', selectedRange.startStr);
+  data.append('fin', selectedRange.endStr);
+  data.append('nombre', nombre);
+  data.append('apellido', apellido);
 
-    select.addEventListener('change', function() {
-      const eventos = allReservas
-        .filter(r => r.propiedad === select.value)
-        .map(r => ({
-          start: r.start,
-          end: r.end ? r.end : r.start,
-          title: r.title,
-          display: 'background',
-          backgroundColor: getColor(r.title)
-        }));
-      calendar.removeAllEvents();
-      calendar.addEventSource(eventos);
-      selectedRange = null;
-      document.getElementById('reserva-info').style.display = 'none';
-    });
-
-    document.getElementById('btnReservar').addEventListener('click', async function() {
-      if(!selectedRange || !select.value) return alert("Seleccioná casa y rango de fechas.");
-      const data = new URLSearchParams();
-      data.append('propiedad', select.value);
-      data.append('inicio', selectedRange.startStr);
-      data.append('fin', selectedRange.endStr);
-
-      const res = await fetch(SCRIPT_URL, { method: 'POST', body: data });
-      const result = await res.json();
-      if(result.status==="ok"){ alert("Reserva registrada!"); location.reload(); }
-      else alert("Error al guardar reserva.");
-    });
-
-  } catch(e) {
-    console.error(e);
-    alert("Error cargando reservas. Revisa la URL del Apps Script y permisos.");
+  const res = await fetch(SCRIPT_URL, { method: 'POST', body: data });
+  const result = await res.json();
+  if(result.status==="ok"){
+    alert(`Reserva registrada! Monto final: $${result.montoFinal}`);
+    location.reload();
+  } else {
+    alert("Error al guardar reserva.");
   }
-}
-
-function getColor(estado) {
-  switch(estado.toLowerCase()) {
-    case 'reserva': return '#FF6B6B';
-    case 'limpieza': return '#FFD93D';
-    case 'mantenimiento': return '#6BCB77';
-    default: return '#4D96FF';
-  }
-}
-
-init();
+});
 </script>
-
-</body>
-</html>
