@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Reservas de Casas</title>
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<style>
+body { font-family: 'Roboto', sans-serif; margin: 0; background: #f0f2f5; }
+header { background: #4a90e2; color: white; padding: 15px; text-align: center; font-size: 1.3em; }
+main { max-width: 900px; margin: 20px auto; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);}
+select, button { width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #ccc; }
+button { background: #4a90e2; color: white; cursor: pointer; }
+button:hover { background: #357abd; }
+#calendar { max-width: 100%; margin: 0 auto 20px; border-radius: 8px; box-shadow:0 3px 10px rgba(0,0,0,0.1);}
+.tooltip { position:absolute; background:#333; color:white; padding:6px 12px; border-radius:6px; font-size:0.85em; display:none; z-index:1000; pointer-events:none;}
+</style>
+</head>
+<body>
+
+<header>📅 Reservas de Casas</header>
+<main>
+<label for="propiedad">Seleccionar propiedad:</label>
+<select id="propiedad"><option value="">-- Cargando --</option></select>
+<div id="calendar"></div>
+<button id="reservarBtn">Reservar</button>
+<div id="tooltip" class="tooltip"></div>
+</main>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycby6JTBwnSekeVvQEHtZlwasW09EIdhy76_ci8_3uVtDW9y7OEm6MzetmUdyX5NK4Azd/exec"; // Reemplaza con tu URL publicada
+
+document.addEventListener('DOMContentLoaded', function () {
+  const calendarEl = document.getElementById('calendar');
+  const propiedadSelect = document.getElementById("propiedad");
+  const tooltip = document.getElementById("tooltip");
+  let eventos = [];
+  let rangoSeleccionado = null;
+
+  function cargarPropiedades(data){
+    const props = [...new Set(data.map(r=>r.propiedad).filter(p=>p))].sort();
+    propiedadSelect.innerHTML = '<option value="">-- Seleccionar propiedad --</option>';
+    props.forEach(p=>{
+      const opt = document.createElement("option");
+      opt.value = p; opt.textContent = p;
+      propiedadSelect.appendChild(opt);
+    });
+  }
+
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    locale: 'es',
+    selectable: true,
+    selectOverlap: false,
+    height: "auto",
+    events: function(fetchInfo, successCallback){
+      fetch(API_URL)
+        .then(res => res.json())
+        .then(data => {
+          eventos = data;
+          cargarPropiedades(eventos);
+          const prop = propiedadSelect.value;
+          const filtrados = prop ? eventos.filter(e=>e.propiedad===prop) : eventos;
+          filtrados.forEach(ev=>{
+            switch((ev.estado||"").toLowerCase()){
+              case "ocupado": ev.color="#f28b82"; break;
+              case "limpieza": ev.color="#fdd663"; break;
+              case "mantenimiento": ev.color="#aecbfa"; break;
+              default: ev.color="#d7ccc8";
+            }
+          });
+          successCallback(filtrados);
+        })
+        .catch(err=>alert("❌ Error al cargar reservas: "+err.message));
+    },
+    select: function(info){
+      const prop = propiedadSelect.value;
+      if(!prop){ alert("Selecciona una propiedad."); calendar.unselect(); return; }
+
+      for(let ev of eventos){
+        if(ev.propiedad!==prop) continue;
+        const evStart = new Date(ev.inicio);
+        const evEnd = new Date(ev.fin);
+        const selStart = new Date(info.startStr);
+        const selEnd = new Date(info.endStr);
+        selEnd.setDate(selEnd.getDate()-1);
+        if(selStart <= evEnd && selEnd >= evStart){
+          alert("El rango incluye fechas ocupadas, limpieza o mantenimiento.");
+          calendar.unselect();
+          return;
+        }
+      }
+      rangoSeleccionado = { start: info.startStr, end: info.endStr };
+    },
+    eventDidMount: function(info){
+      info.el.addEventListener('mouseenter', e=>{
+        tooltip.style.display="block";
+        tooltip.innerHTML=`<strong>${info.event.title}</strong><br>${info.event.extendedProps.estado||''}`;
+      });
+      info.el.addEventListener('mousemove', e=>{
+        tooltip.style.top=(e.pageY+10)+"px";
+        tooltip.style.left=(e.pageX+10)+"px";
+      });
+      info.el.addEventListener('mouseleave', ()=>{ tooltip.style.display="none"; });
+    }
+  });
+
+  calendar.render();
+
+  propiedadSelect.addEventListener("change", ()=>{ calendar.refetchEvents(); rangoSeleccionado=null; });
+
+  document.getElementById("reservarBtn").addEventListener("click", ()=>{
+    if(!propiedadSelect.value){ alert("Selecciona una propiedad."); return; }
+    if(!rangoSeleccionado){ alert("Selecciona un rango de fechas."); return; }
+
+    const reserva = { propiedad: propiedadSelect.value, inicio:rangoSeleccionado.start, fin:rangoSeleccionado.end, estado:"Ocupado"};
+
+    fetch(API_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(reserva)
+    })
+    .then(res=>res.json())
+    .then(resp=>{
+      if(resp.result==="ok"){
+        alert(`✅ Reserva registrada: ${reserva.inicio} → ${reserva.fin}`);
+        rangoSeleccionado=null;
+        calendar.refetchEvents();
+      }else{
+        alert(`❌ Error al guardar: ${resp.message||'desconocido'}`);
+      }
+    })
+    .catch(err=>alert(`❌ Error de conexión: ${err.message}`));
+  });
+
+});
+</script>
+
+</body>
+</html>
