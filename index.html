@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="es">
+<!DOCTYPE html>
+<html lang="es">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -18,21 +19,26 @@
 </head>
 <body>
 <header>
-  <h1>🧩 Puzzle Piece Tracker — Marca piezas</h1>
+  <h1>🧩 Puzzle Piece Tracker</h1>
 </header>
 <div class="wrap">
   <aside>
     <label>Imagen</label>
     <input id="imgFile" type="file" accept="image/*" />
     <input id="imgUrl" type="text" placeholder="URL de la imagen" />
-    <button id="btnLoad">Cargar</button><label>Columnas × Filas</label>
-<input id="cols" type="number" value="50" min="1" />
-<input id="rows" type="number" value="30" min="1" />
-<button id="btnGrid" class="primary">Aplicar</button>
+    <button id="btnLoad">Cargar</button>
 
-<button id="btnToggleIndex">Mostrar IDs</button>
-<button id="btnDownload">Descargar PNG</button>
+    <label>Columnas × Filas</label>
+    <input id="cols" type="number" value="50" min="1" />
+    <input id="rows" type="number" value="30" min="1" />
+    <button id="btnGrid" class="primary">Aplicar</button>
 
+    <button id="btnToggleIndex">Mostrar IDs</button>
+    <button id="btnSave">Guardar progreso</button>
+    <button id="btnLoadSave">Cargar progreso</button>
+    <button id="btnExport">Exportar JSON</button>
+    <button id="btnImport">Importar JSON</button>
+    <button id="btnDownload">Descargar PNG</button>
   </aside>
   <div class="canvas-wrap">
     <canvas id="canvas"></canvas>
@@ -44,19 +50,124 @@
   const ctx = canvas.getContext('2d');
   let img = new Image();
   let cols=50, rows=30;
-  let grid=[]; let showIndex=false;function newGrid(){grid=new Array(cols*rows).fill(0);draw();}
+  let grid=[]; let showIndex=false;
 
-function draw(){ if(!img.src) return; ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0); const cellW=canvas.width/cols, cellH=canvas.height/rows; for(let r=0;r<rows;r++){ for(let c=0;c<cols;c++){ const idx=rcols+c; if(grid[idx]===1){ctx.fillStyle="#22c55e55";ctx.fillRect(ccellW,rcellH,cellW,cellH);} else if(grid[idx]===2){ctx.strokeStyle="#ef4444";ctx.beginPath();ctx.moveTo(ccellW,rcellH);ctx.lineTo((c+1)cellW,(r+1)cellH);ctx.moveTo((c+1)cellW,rcellH);ctx.lineTo(ccellW,(r+1)cellH);ctx.stroke();} } } ctx.strokeStyle="#ffffff55";ctx.lineWidth=1; for(let c=1;c<cols;c++){ctx.beginPath();ctx.moveTo(ccellW,0);ctx.lineTo(ccellW,canvas.height);ctx.stroke();} for(let r=1;r<rows;r++){ctx.beginPath();ctx.moveTo(0,rcellH);ctx.lineTo(canvas.width,rcellH);ctx.stroke();} if(showIndex){ctx.fillStyle="#fff";ctx.font="10px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle"; for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)ctx.fillText(${c+1},${r+1},ccellW+cellW/2,r*cellH+cellH/2);} }
+  function newGrid(){grid=new Array(cols*rows).fill(0);draw();}
 
-function posToIndex(evt){const rect=canvas.getBoundingClientRect();const x=(evt.clientX-rect.left);const y=(evt.clientY-rect.top);const c=Math.floor(x/(canvas.width/cols));const r=Math.floor(y/(canvas.height/rows));return r*cols+c;}
+  function draw(){
+    if(!img.src) return;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0);
+    const cellW=canvas.width/cols, cellH=canvas.height/rows;
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        const idx=r*cols+c;
+        if(grid[idx]===1){
+          ctx.fillStyle="#22c55e55";
+          ctx.fillRect(c*cellW,r*cellH,cellW,cellH);
+        } else if(grid[idx]===2){
+          ctx.strokeStyle="#ef4444";
+          ctx.beginPath();
+          ctx.moveTo(c*cellW,r*cellH);
+          ctx.lineTo((c+1)*cellW,(r+1)*cellH);
+          ctx.moveTo((c+1)*cellW,r*cellH);
+          ctx.lineTo(c*cellW,(r+1)*cellH);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.strokeStyle="#ffffff55";ctx.lineWidth=1;
+    for(let c=1;c<cols;c++){ctx.beginPath();ctx.moveTo(c*cellW,0);ctx.lineTo(c*cellW,canvas.height);ctx.stroke();}
+    for(let r=1;r<rows;r++){ctx.beginPath();ctx.moveTo(0,r*cellH);ctx.lineTo(canvas.width,r*cellH);ctx.stroke();}
+    if(showIndex){
+      ctx.fillStyle="#fff";ctx.font="10px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+      for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)ctx.fillText(`${c+1},${r+1}`,c*cellW+cellW/2,r*cellH+cellH/2);
+    }
+  }
 
-canvas.addEventListener('click',e=>{const idx=posToIndex(e);grid[idx]=(grid[idx]+1)%3;draw();});
+  function posToIndex(evt){
+    const rect=canvas.getBoundingClientRect();
+    const scaleX=canvas.width/rect.width, scaleY=canvas.height/rect.height;
+    const x=(evt.clientX-rect.left)*scaleX;
+    const y=(evt.clientY-rect.top)*scaleY;
+    const c=Math.floor(x/(canvas.width/cols));
+    const r=Math.floor(y/(canvas.height/rows));
+    return r*cols+c;
+  }
 
-document.getElementById('btnLoad').addEventListener('click',()=>{ const file=document.getElementById('imgFile').files[0];const url=document.getElementById('imgUrl').value.trim(); if(file){img.src=URL.createObjectURL(file);} else if(url){img.crossOrigin='anonymous';img.src=url;} else alert('Subí un archivo o pegá URL'); });
+  canvas.addEventListener('click',e=>{
+    const idx=posToIndex(e);
+    if(e.shiftKey){grid[idx]=2;} else {grid[idx]=(grid[idx]+1)%3;}
+    draw();
+  });
+  canvas.addEventListener('contextmenu',e=>{
+    e.preventDefault();
+    const idx=posToIndex(e);
+    grid[idx]=(grid[idx]+1)%3;
+    draw();
+  });
 
-img.onload=()=>{canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;newGrid();};
+  document.getElementById('btnLoad').addEventListener('click',()=>{
+    const file=document.getElementById('imgFile').files[0];
+    const url=document.getElementById('imgUrl').value.trim();
+    if(file){img.src=URL.createObjectURL(file);} 
+    else if(url){img.crossOrigin='anonymous';img.src=url;} 
+    else alert('Subí un archivo o pegá URL');
+  });
 
-document.getElementById('btnGrid').addEventListener('click',()=>{cols=parseInt(document.getElementById('cols').value);rows=parseInt(document.getElementById('rows').value);newGrid();}); document.getElementById('btnToggleIndex').addEventListener('click',()=>{showIndex=!showIndex;draw();}); document.getElementById('btnDownload').addEventListener('click',()=>{const a=document.createElement('a');a.download='puzzle.png';a.href=canvas.toDataURL('image/png');a.click();}); })(); </script>
+  img.onload=()=>{
+    canvas.width=img.naturalWidth;
+    canvas.height=img.naturalHeight;
+    newGrid();
+  };
 
+  document.getElementById('btnGrid').addEventListener('click',()=>{
+    cols=parseInt(document.getElementById('cols').value);
+    rows=parseInt(document.getElementById('rows').value);
+    newGrid();
+  });
+
+  document.getElementById('btnToggleIndex').addEventListener('click',()=>{
+    showIndex=!showIndex;draw();
+  });
+
+  document.getElementById('btnSave').addEventListener('click',()=>{
+    localStorage.setItem('puzzleGrid',JSON.stringify({cols,rows,grid}));
+    alert('Progreso guardado en el navegador');
+  });
+  document.getElementById('btnLoadSave').addEventListener('click',()=>{
+    const saved=JSON.parse(localStorage.getItem('puzzleGrid')||'null');
+    if(saved){cols=saved.cols;rows=saved.rows;grid=saved.grid;document.getElementById('cols').value=cols;document.getElementById('rows').value=rows;draw();}
+    else alert('No hay progreso guardado');
+  });
+
+  document.getElementById('btnExport').addEventListener('click',()=>{
+    const data=JSON.stringify({cols,rows,grid});
+    const blob=new Blob([data],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='puzzle.json';
+    a.click();
+  });
+  document.getElementById('btnImport').addEventListener('click',()=>{
+    const inp=document.createElement('input');
+    inp.type='file';inp.accept='application/json';
+    inp.onchange=e=>{
+      const file=e.target.files[0];
+      const reader=new FileReader();
+      reader.onload=()=>{const saved=JSON.parse(reader.result);cols=saved.cols;rows=saved.rows;grid=saved.grid;document.getElementById('cols').value=cols;document.getElementById('rows').value=rows;draw();};
+      reader.readAsText(file);
+    };
+    inp.click();
+  });
+
+  document.getElementById('btnDownload').addEventListener('click',()=>{
+    const a=document.createElement('a');
+    a.download='puzzle.png';
+    a.href=canvas.toDataURL('image/png');
+    a.click();
+  });
+})();
+</script>
 </body>
 </html>
